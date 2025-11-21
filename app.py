@@ -5,15 +5,29 @@ from torchvision import transforms
 from PIL import Image
 import io
 
+# ------------------------
 # Device configuration
+# ------------------------
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# ------------------------
 # Paths and classes
+# ------------------------
 MODEL_PATH = "model/best_resnet18_attention_full.pth"
 CLASS_NAMES = ["Glioma", "Meningioma", "NoTumor", "Pituitary"]
 
-from torchvision.models import resnet18, ResNet18_Weights
+# ------------------------
+# Model definition
+# ------------------------
 import torch.nn as nn
+from torchvision.models import resnet18, ResNet18_Weights
+from torch.nn.modules.container import Sequential
+from torch.nn.modules.conv import Conv2d
+from torch.nn.modules.batchnorm import BatchNorm2d
+from torch.nn.modules.activation import ReLU, Sigmoid
+from torch.nn.modules.pooling import MaxPool2d, AdaptiveAvgPool2d
+from torchvision.models.resnet import BasicBlock
+
 
 class ConvAttention(nn.Module):
     def __init__(self, kernel_size=7):
@@ -29,6 +43,7 @@ class ConvAttention(nn.Module):
         out = self.conv(out)
         att = self.sigmoid(out)
         return x * att
+
 
 class ResNet18WithConvAttention(nn.Module):
     def __init__(self, num_classes):
@@ -56,45 +71,73 @@ class ResNet18WithConvAttention(nn.Module):
         x = torch.flatten(x, 1)
         return self.fc(x)
 
-# Allowlist the custom model class for safe loading
-import torch.serialization
-torch.serialization.add_safe_globals([ResNet18WithConvAttention])
 
-# Load the model checkpoint with map_location
-model = torch.load(MODEL_PATH, map_location=DEVICE)
+# ------------------------
+# Safe loading with weights_only=True
+# ------------------------
+import torch.serialization
+
+torch.serialization.add_safe_globals([
+    ResNet18WithConvAttention,
+    ConvAttention,
+    set,
+    Sequential,
+    Conv2d,
+    BatchNorm2d,
+    ReLU,
+    Sigmoid,
+    MaxPool2d,
+    AdaptiveAvgPool2d,
+    BasicBlock,
+])
+
+# Load model
+model = torch.load(MODEL_PATH, map_location=DEVICE)  # removed weights_only=True
 model.to(DEVICE)
 model.eval()
-
+# ------------------------
+# Image transformations
+# ------------------------
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
 ])
 
+# ------------------------
+# Flask App
+# ------------------------
 app = Flask(__name__)
 CORS(app)
+
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
+
 @app.route("/predict", methods=["POST"])
 def predict():
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded"}), 400
+
     img_bytes = request.files["image"].read()
     image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     image = transform(image).unsqueeze(0).to(DEVICE)
+
     with torch.no_grad():
         outputs = model(image)
         probs = torch.softmax(outputs, dim=1)
         conf, pred = torch.max(probs, 1)
+
     return jsonify({
         "predicted_class": CLASS_NAMES[pred.item()],
         "confidence": float(conf.item())
     })
 
+
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 5000))
+
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
