@@ -8,21 +8,22 @@ from PIL import Image
 import io
 import os
 
-# ------------------------
-# Device configuration
-# ------------------------
+# ----------------------------------------------------
+# Device
+# ----------------------------------------------------
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {DEVICE}")
+print("Using:", DEVICE)
 
-# ------------------------
-# Paths and classes
-# ------------------------
-MODEL_PATH = "model/best_resnet18_attention_full.pth"
-CLASS_NAMES = ["Glioma", "Meningioma", "NoTumor", "Pituitary"]
+# ----------------------------------------------------
+# Paths & Classes
+# ----------------------------------------------------
+MODEL_PATH = "model/model_weights.pth"
+CLASS_NAMES = ["Glioma", "Meningioma", "Notumor", "Pituitary"]
 
-# ------------------------
-# Custom model classes
-# ------------------------
+
+# ----------------------------------------------------
+# ConvAttention
+# ----------------------------------------------------
 class ConvAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super().__init__()
@@ -31,29 +32,41 @@ class ConvAttention(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        avgout = torch.mean(x, dim=1, keepdim=True)
-        maxout, _ = torch.max(x, dim=1, keepdim=True)
-        out = torch.cat([avgout, maxout], dim=1)
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        out = torch.cat([avg_out, max_out], dim=1)
         out = self.conv(out)
-        att = self.sigmoid(out)
-        return x * att
+        attention = self.sigmoid(out)
+        return x * attention
 
+
+# ----------------------------------------------------
+# ResNet18 with attention
+# ----------------------------------------------------
 class ResNet18WithConvAttention(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
         base = resnet18(weights=ResNet18_Weights.DEFAULT)
+
         self.features = nn.Sequential(
-            base.conv1, base.bn1, base.relu, base.maxpool,
-            base.layer1, base.layer2, base.layer3
+            base.conv1,
+            base.bn1,
+            base.relu,
+            base.maxpool,
+            base.layer1,
+            base.layer2,
+            base.layer3,
         )
-        self.attn = ConvAttention(kernel_size=7)
+
+        self.attn = ConvAttention(kernel_size=5)
         self.layer4 = base.layer4
         self.avgpool = base.avgpool
+
         self.fc = nn.Sequential(
-            nn.Linear(base.fc.in_features, 256),
+            nn.Linear(base.fc.in_features, 64),
             nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Linear(256, num_classes)
+            nn.Dropout(0.5),
+            nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
@@ -64,32 +77,41 @@ class ResNet18WithConvAttention(nn.Module):
         x = torch.flatten(x, 1)
         return self.fc(x)
 
-# ------------------------
-# Load the model
-# ------------------------
+
+# ----------------------------------------------------
+# Load model weights
+# ----------------------------------------------------
 model = ResNet18WithConvAttention(num_classes=len(CLASS_NAMES))
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+state = torch.load(
+    MODEL_PATH,
+    map_location=DEVICE,
+    weights_only=True
+)
+
+model.load_state_dict(state)
 model.to(DEVICE)
 model.eval()
 
-# ------------------------
-# Image preprocessing
-# ------------------------
+# ----------------------------------------------------
+# Transform
+# ----------------------------------------------------
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    transforms.Normalize([0.5], [0.5])
 ])
 
-# ------------------------
-# Flask app
-# ------------------------
+# ----------------------------------------------------
+# Flask App
+# ----------------------------------------------------
 app = Flask(__name__)
 CORS(app)
 
+
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return "Brain Tumor Classification API Running"
+
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -98,6 +120,7 @@ def predict():
 
     img_bytes = request.files["image"].read()
     image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
     image = transform(image).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
@@ -110,9 +133,10 @@ def predict():
         "confidence": float(conf.item())
     })
 
-# ------------------------
-# Run app
-# ------------------------
+
+# ----------------------------------------------------
+# Run App
+# ----------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
