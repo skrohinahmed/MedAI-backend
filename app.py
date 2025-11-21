@@ -56,10 +56,11 @@ class ResNet18WithConvAttention(nn.Module):
         x = torch.flatten(x, 1)
         return self.fc(x)
 
-# PyTorch 2.6+ model loading fix
+# Allowlist the custom model class for safe loading
 import torch.serialization
 torch.serialization.add_safe_globals([ResNet18WithConvAttention])
 
+# Load the model checkpoint with map_location
 model = torch.load(MODEL_PATH, map_location=DEVICE)
 model.to(DEVICE)
 model.eval()
