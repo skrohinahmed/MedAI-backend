@@ -28,8 +28,7 @@ class ConvAttention(nn.Module):
         out = torch.cat([avgout, maxout], dim=1)
         out = self.conv(out)
         att = self.sigmoid(out)
-        return x * att * Running on http://192.168.43.189:5000
-
+        return x * att
 
 class ResNet18WithConvAttention(nn.Module):
     def __init__(self, num_classes):
@@ -57,14 +56,13 @@ class ResNet18WithConvAttention(nn.Module):
         x = torch.flatten(x, 1)
         return self.fc(x)
 
-# ------- PyTorch 2.6+ model loading fix -------
+# PyTorch 2.6+ model loading fix
 import torch.serialization
 torch.serialization.add_safe_globals([ResNet18WithConvAttention])
 
 model = torch.load(MODEL_PATH, map_location=DEVICE)
 model.to(DEVICE)
 model.eval()
-# ---------------------------------------------
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
