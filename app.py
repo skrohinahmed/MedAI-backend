@@ -12,6 +12,7 @@ import os
 # Device configuration
 # ------------------------
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {DEVICE}")
 
 # ------------------------
 # Paths and classes
@@ -66,7 +67,8 @@ class ResNet18WithConvAttention(nn.Module):
 # ------------------------
 # Load the model
 # ------------------------
-model = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
+model = ResNet18WithConvAttention(num_classes=len(CLASS_NAMES))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 model.to(DEVICE)
 model.eval()
 
@@ -112,5 +114,5 @@ def predict():
 # Run app
 # ------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

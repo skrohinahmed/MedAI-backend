@@ -1,7 +1,6 @@
 flask
 flask-cors
-gunicorn
 torch
 torchvision
-Pillow
-numpy
+pillow
+gunicorn
