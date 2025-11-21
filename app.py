@@ -110,7 +110,7 @@ CORS(app)
 
 @app.route("/")
 def home():
-    return "Brain Tumor Classification API Running"
+    return render_template("index.html")
 
 
 @app.route("/predict", methods=["POST"])
