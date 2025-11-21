@@ -92,9 +92,11 @@ torch.serialization.add_safe_globals([
 ])
 
 # Load model
-model = torch.load(MODEL_PATH, map_location=DEVICE)  # removed weights_only=True
+# Correct way to load your model
+model = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
 model.to(DEVICE)
 model.eval()
+
 # ------------------------
 # Image transformations
 # ------------------------
