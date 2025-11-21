@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import torch
+import torch.nn as nn
 from torchvision import transforms
+from torchvision.models import resnet18, ResNet18_Weights
 from PIL import Image
 import io
+import os
 
 # ------------------------
 # Device configuration
@@ -17,18 +20,8 @@ MODEL_PATH = "model/best_resnet18_attention_full.pth"
 CLASS_NAMES = ["Glioma", "Meningioma", "NoTumor", "Pituitary"]
 
 # ------------------------
-# Model definition
+# Custom model classes
 # ------------------------
-import torch.nn as nn
-from torchvision.models import resnet18, ResNet18_Weights
-from torch.nn.modules.container import Sequential
-from torch.nn.modules.conv import Conv2d
-from torch.nn.modules.batchnorm import BatchNorm2d
-from torch.nn.modules.activation import ReLU, Sigmoid
-from torch.nn.modules.pooling import MaxPool2d, AdaptiveAvgPool2d
-from torchvision.models.resnet import BasicBlock
-
-
 class ConvAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super().__init__()
@@ -43,7 +36,6 @@ class ConvAttention(nn.Module):
         out = self.conv(out)
         att = self.sigmoid(out)
         return x * att
-
 
 class ResNet18WithConvAttention(nn.Module):
     def __init__(self, num_classes):
@@ -71,34 +63,15 @@ class ResNet18WithConvAttention(nn.Module):
         x = torch.flatten(x, 1)
         return self.fc(x)
 
-
 # ------------------------
-# Safe loading with weights_only=True
+# Load the model
 # ------------------------
-import torch.serialization
-
-torch.serialization.add_safe_globals([
-    ResNet18WithConvAttention,
-    ConvAttention,
-    set,
-    Sequential,
-    Conv2d,
-    BatchNorm2d,
-    ReLU,
-    Sigmoid,
-    MaxPool2d,
-    AdaptiveAvgPool2d,
-    BasicBlock,
-])
-
-# Load model
-# Correct way to load your model
 model = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
 model.to(DEVICE)
 model.eval()
 
 # ------------------------
-# Image transformations
+# Image preprocessing
 # ------------------------
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -107,16 +80,14 @@ transform = transforms.Compose([
 ])
 
 # ------------------------
-# Flask App
+# Flask app
 # ------------------------
 app = Flask(__name__)
 CORS(app)
 
-
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -137,9 +108,9 @@ def predict():
         "confidence": float(conf.item())
     })
 
-
+# ------------------------
+# Run app
+# ------------------------
 if __name__ == "__main__":
-    import os
-
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(port=port)
