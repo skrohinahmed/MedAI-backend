@@ -18,7 +18,7 @@ print("Using:", DEVICE)
 # Paths & Classes
 # ----------------------------------------------------
 MODEL_PATH = "model/model_weights.pth"
-CLASS_NAMES = ["Glioma", "Meningioma", "Notumor", "Pituitary"]
+CLASS_NAMES = ["Glioma", "Meningioma", "No-tumor", "Pituitary"]
 
 
 # ----------------------------------------------------
@@ -120,8 +120,8 @@ def predict():
         return jsonify({"error": "No image uploaded"}), 400
 
     img_bytes = request.files["image"].read()
-    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-
+    image = Image.open(io.BytesIO(img_bytes))
+    image = image.resize((224, 224))
     image = transform(image).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
