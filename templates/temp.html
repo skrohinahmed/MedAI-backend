@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Image Capture and Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f9f9f9;
+    }
+    #previewImage {
+      max-width: 300px;
+      margin-top: 1rem;
+      display: none;
+      border: 1px solid #ccc;
+      padding: 5px;
+    }
+    #response {
+      margin-top: 1rem;
+      padding: 10px;
+      border: 1px solid #0073e6;
+      background-color: #e6f0ff;
+      max-width: 300px;
+      white-space: pre-wrap;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Upload and Analyze Image</h2>
+
+<input type="file" id="fileInput" accept="image/*" />
+<img id="previewImage" alt="Image preview" />
+<br />
+<button id="uploadBtn">Upload Image</button>
+
+<div id="response"></div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const previewImage = document.getElementById('previewImage');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const responseDiv = document.getElementById('response');
+
+  let selectedFile = null;
+
+  fileInput.addEventListener('change', (e) => {
+    selectedFile = e.target.files[0];
+    if (selectedFile && selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        previewImage.src = event.target.result;
+        previewImage.style.display = 'block';
+      };
+      reader.readAsDataURL(selectedFile);
+      responseDiv.textContent = '';
+    } else {
+      previewImage.style.display = 'none';
+      selectedFile = null;
+      alert('Please select a valid image file.');
+      responseDiv.textContent = '';
+    }
+  });
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) {
+      alert('No image file selected to upload.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    responseDiv.textContent = 'Uploading...';
+
+    try {
+      const response = await fetch('https://medai-backend-3-8l4n.onrender.com/predict', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) throw new Error('Upload failed: ' + response.statusText);
+
+      const data = await response.json();
+      responseDiv.textContent = 'Upload successful:\n' + JSON.stringify(data, null, 2);
+    } catch (error) {
+      responseDiv.textContent = 'Error: ' + error.message;
+    }
+  });
+</script>
+
+</body>
+</html>
