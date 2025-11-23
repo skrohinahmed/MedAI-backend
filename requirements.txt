@@ -1,5 +1,6 @@
 flask
 flask-cors
+onnxruntime
 torch
 torchvision
 pillow
