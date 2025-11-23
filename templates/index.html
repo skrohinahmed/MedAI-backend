@@ -1546,7 +1546,7 @@
                 // If your backend returns predicted_class and confidence like before,
                 // keep displayResults. If not, this will at least show raw JSON.
                 displayResults(data);
-                showAlert('Upload successful: ' + JSON.stringify(data), 'success');
+                showAlert('Upload successful: ', 'success');
 
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
